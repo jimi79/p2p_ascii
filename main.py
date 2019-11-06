@@ -36,8 +36,8 @@ def main(stdscr):
 	computers.print_content() 
 
 	a = ''
-	c = 1
-	while (a != 'q') or (computers.max_length() > 100): 
+	c = 0
+	while (a != 'q') and (computers.max_length() < 100): 
 # add a value
 		if c % 10 == 0:
 			computers.add_random()
