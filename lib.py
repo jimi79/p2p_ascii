@@ -170,13 +170,18 @@ class Links:
 
 	def switch_some(self, count = 40):
 		for i in range(0, count):
-			if len(self.links) > 0:
-				link = random.choice(self.links)
-				link.enabled = not link.enabled
+			link = random.choice(self.links)
+			link.enabled = not link.enabled
+			link.src.draw_links()
+			
+	def disable_some(self, count = 40):
+		for i in range(0, count):
+			link = random.choice(self.links)
+			link.enabled = False
 
 	def apply(self, computers):
 		for comp in computers.list:
-			comp.links = []
+			comp.linked_to = []
 		for link in self.links:
 			if link.enabled:
 				link.src.linked_to.append(link.dst)
