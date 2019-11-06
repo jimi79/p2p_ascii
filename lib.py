@@ -4,39 +4,33 @@ import curses
 value_good = ['mars', 'venus', 'mercure', 'earth', 'uranus', 'jupiter', 'neptune', 'saturn']
 value_bad = ['thieves', 'steal', 'pirates', 'hackers']
 
-
+min_=4
+max_=10
 
 class Block:
-	def get_random_value(self, bad):
-		if not bad:
-			return random.choice(value_good)
-		else:
-			return random.choice(value_bad)
+	def __init__(self):
+		self.value = 3
 
-	def init(self, bad): 
+	def init(self): 
 		#self.value = self.get_random_value(bad)
-		#self.hash = sum([ord(s) for s in self.value]) % 1000
-		self.value = ''.join([random.choice('0123456789abcdef') for i in range(0, 10)])
-		self.hash = 0
+		#self.value = ''.join([random.choice('0123456789abcdef') for i in range(0, 10)])
+		self.value = random.randrange(min_, max_)
 		self.block_number = -1
-		self.bad = bad
 
 	def copy(self):
 		b = Block()
 		b.value = self.value
-		b.hash = self.hash
 		b.block_number = self.block_number
-		b.bad = self.bad
 		return b
 
 class Chain:
 	def __init__(self):
 		self.blocks = []
 
-	def add(self, bad):
+	def add(self):
 		#self.blocks = self.blocks[-4:]
 		block = Block()
-		block.init(bad)
+		block.init()
 		block.block_number = len(self.blocks)
 		self.blocks.append(block) 
 
@@ -57,6 +51,7 @@ class Computer:
 		self.line = line
 		self.col = col
 		self.linked_to = []
+		self.wrong = 0
 
 	def draw(self):
 		self.stdscr.addstr(self.line*6+0, self.col*14, '┌──────────┐')
@@ -70,26 +65,14 @@ class Computer:
 			if (l.line == self.line) and (l.col == self.col + 1):
 				self.stdscr.addstr(self.line*6+2, self.col*14+12, '──') 
 
+	def print_content_3(self):
+		if self.chain.length() > 0:
+			for i in range(1, 4): 
+				if self.chain.length() > i:
+					self.stdscr.addstr(self.line*6+i, self.col*14+1, '          ', curses.color_pair(self.chain.blocks[-i].value))
+
 	def print_content(self):
-		i = 0
-		for block in self.chain.blocks[-3:]:
-			self.stdscr.addstr(self.line*6+1+i, self.col*14+1, '          ')
-			if block.bad:
-				self.stdscr.addstr(self.line*6+1+i, self.col*14+1, block.value[0:10], curses.color_pair(1))
-			else: 
-				self.stdscr.addstr(self.line*6+1+i, self.col*14+1, block.value[0:10])
-			i = i + 1
-		self.stdscr.addstr(self.line*6+1, self.col*14+7, '%4d' % self.chain.length())
-		bad = False
-		for block in self.chain.blocks:
-			if block.bad:
-				bad = True
-		self.stdscr.addstr(self.line*6+1, self.col*14+7, '%4d' % self.chain.length())
-		self.stdscr.addstr(self.line*6+0, self.col*14, '┌──────────┐')
-		if bad:
-			self.stdscr.addstr(self.line*6, self.col*14+4, 'fail', curses.color_pair(1))
-		else:
-			self.stdscr.addstr(self.line*6, self.col*14+4, 'ok')
+		self.print_content_3()
 
 	def copy_from_neighbour(self, neighbour): 
 		for block in neighbour.chain.blocks[self.new_chain.length():]:
@@ -99,11 +82,14 @@ class Computer:
 		if self.new_chain.length() == 0:
 			self.copy_from_neighbour(neighbour)
 		else:
-			if neighbour.new_chain.blocks[self.new_chain.length() - 1].hash == self.new_chain.blocks[-1].hash:
-				self.copy_from_neighbour(neighbour)
+			self.copy_from_neighbour(neighbour)
 
 	def copy_from_neighbour(self, neighbour):
 		self.new_chain = neighbour.chain.copy()
+		a = sum([block.value for block in self.chain.blocks])
+		b = sum([block.value for block in self.new_chain.blocks[0:self.chain.length()]])
+		if a != b:
+			self.wrong = self.wrong + 1
 
 	def write_line(self, i, s):
 		self.stdscr.addstr(self.line*6+1+i, self.col*14+1, s)
@@ -152,8 +138,11 @@ class Computers:
 		for comp in self.list:
 			comp.time_shift()
 
-	def add_random(self, bad):
-		random.choice(self.list).chain.add(bad)
+	def add_random(self):
+		random.choice(self.list).chain.add()
+
+	def max_length(self):
+		return max([comp.chain.length() for comp in self.list])
 
 class Links:
 	def __init__(self, computers):
@@ -170,7 +159,8 @@ class Links:
 
 	def remove_some(self, count = 40):
 		for i in range(0, count):
-			self.links.pop(random.randrange(0, len(self.links)))
+			if len(self.links) > 0:
+				self.links.pop(random.randrange(0, len(self.links)))
 
 
 	def apply(self, computers):
