@@ -8,15 +8,6 @@ min_=4
 max_=10
 
 class Block:
-	def __init__(self):
-		self.value = 3
-
-	def init(self): 
-		#self.value = self.get_random_value(bad)
-		#self.value = ''.join([random.choice('0123456789abcdef') for i in range(0, 10)])
-		self.value = random.randrange(min_, max_)
-		self.block_number = -1
-
 	def copy(self):
 		b = Block()
 		b.value = self.value
@@ -27,10 +18,10 @@ class Chain:
 	def __init__(self):
 		self.blocks = []
 
-	def add(self):
+	def add(self, color):
 		#self.blocks = self.blocks[-4:]
 		block = Block()
-		block.init()
+		block.value = color
 		block.block_number = len(self.blocks)
 		self.blocks.append(block) 
 
@@ -59,11 +50,17 @@ class Computer:
 		self.stdscr.addstr(self.line*6+2, self.col*14, '│          │')
 		self.stdscr.addstr(self.line*6+3, self.col*14, '│          │')
 		self.stdscr.addstr(self.line*6+4, self.col*14, '└──────────┘')
+	
+	def draw_links(self):
 		for l in self.linked_to:
 			if (l.line == self.line + 1) and (l.col == self.col):
 				self.stdscr.addstr(self.line*6+5, self.col*14+6, '│')
+			else:
+				self.stdscr.addstr(self.line*6+5, self.col*14+6, ' ')
 			if (l.line == self.line) and (l.col == self.col + 1):
 				self.stdscr.addstr(self.line*6+2, self.col*14+12, '──') 
+			else:
+				self.stdscr.addstr(self.line*6+2, self.col*14+12, '  ') 
 
 	def print_content_3(self):
 		if self.chain.length() > 0:
@@ -118,6 +115,9 @@ class Computers:
 		self.lines = 8 
 		self.count = self.cols * self.lines
 		self.list = []
+		self.colors = [4, 5, 6, 7, 8, 9, 10]
+		self.idx_col = 0
+		random.shuffle(self.colors)
 		for i in range(0, self.lines):
 			for j in range(0, self.cols):
 				self.list.append(Computer(stdscr, i, j))
@@ -125,6 +125,10 @@ class Computers:
 	def draw(self):
 		for i in range(self.count):
 			self.list[i].draw()
+
+	def draw_links(self):
+		for i in range(self.count):
+			self.list[i].draw_links()
 
 	def print_content(self):
 		for i in range(self.count):
@@ -139,10 +143,17 @@ class Computers:
 			comp.time_shift()
 
 	def add_random(self):
-		random.choice(self.list).chain.add()
+		random.choice(self.list).chain.add(self.colors[self.idx_col])
+		self.idx_col = (self.idx_col + 1) % len(self.colors)
 
 	def max_length(self):
 		return max([comp.chain.length() for comp in self.list])
+
+class Link:
+	def __init__(self, src, dst):
+		self.src = src
+		self.dst = dst
+		self.enabled = True
 
 class Links:
 	def __init__(self, computers):
@@ -152,18 +163,21 @@ class Links:
 				comp = computers.list[i * computers.cols + j]
 				if j < computers.cols - 1:
 					comp_to_the_right = computers.list[i * computers.cols + j + 1]
-					self.links.append((comp, comp_to_the_right))
+					self.links.append(Link(comp, comp_to_the_right))
 				if i < computers.lines - 1:
 					comp_underneath = computers.list[(i + 1) * computers.cols + j] 
-					self.links.append((comp, comp_underneath))
+					self.links.append(Link(comp, comp_underneath))
 
-	def remove_some(self, count = 40):
+	def switch_some(self, count = 40):
 		for i in range(0, count):
 			if len(self.links) > 0:
-				self.links.pop(random.randrange(0, len(self.links)))
-
+				link = random.choice(self.links)
+				link.enabled = not link.enabled
 
 	def apply(self, computers):
+		for comp in computers.list:
+			comp.links = []
 		for link in self.links:
-			link[0].linked_to.append(link[1])
-			link[1].linked_to.append(link[0])
+			if link.enabled:
+				link.src.linked_to.append(link.dst)
+				link.dst.linked_to.append(link.src)

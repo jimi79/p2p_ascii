@@ -29,16 +29,26 @@ def main(stdscr):
 	#test
 
 	l = lib.Links(computers)
-	l.remove_some(60)
+	l.switch_some(60)
 	l.apply(computers)
 	computers.draw() 
+	computers.draw_links()
 	computers.print_content() 
 
 	a = ''
 	c = 1
-	while (a != 'q') or (computers.max_length > 100): 
+	while (a != 'q') or (computers.max_length() > 100): 
+# add a value
 		if random.randrange(0, 10) == 0:
 			computers.add_random()
+
+# change links
+		if random.randrange(0, 20) == 0:
+			l.switch_some(60)
+			l.apply(computers)
+			computers.draw_links()
+
+
 		#if (a == ' '):
 		#	computers.add_random()
 		#	a = '' 
