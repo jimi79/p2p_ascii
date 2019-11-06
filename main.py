@@ -39,17 +39,17 @@ def main(stdscr):
 	c = 1
 	while (a != 'q') or (computers.max_length() > 100): 
 # add a value
-		if random.randrange(0, 20) == 0:
+		if c % 10 == 0:
 			computers.add_random()
 
 # change links
-		if random.randrange(0, 10) == 0:
+		if c % 5 == 0:
 			l = lib.Links(computers)
 			l.disable_some(100)
 			l.apply(computers)
 			computers.draw_links()
 
-
+		c = (c + 1) % 100
 
 		#if (a == ' '):
 		#	computers.add_random()
