@@ -1,11 +1,14 @@
 import random
 import curses
+import shutil
+import sys
 
 value_good = ['mars', 'venus', 'mercure', 'earth', 'uranus', 'jupiter', 'neptune', 'saturn']
 value_bad = ['thieves', 'steal', 'pirates', 'hackers']
 
-min_=4
-max_=10
+def debug(s):
+	open("debug.log", "a").write("%s\n" % s)
+
 
 class Block:
 	def copy(self):
@@ -43,6 +46,7 @@ class Computer:
 		self.col = col
 		self.linked_to = []
 		self.wrong = 0
+		self.new_chain = None
 
 	def draw(self):
 		self.stdscr.addstr(self.line*6+0, self.col*14, '┌──────────┐')
@@ -52,26 +56,29 @@ class Computer:
 		self.stdscr.addstr(self.line*6+4, self.col*14, '└──────────┘')
 	
 	def draw_links(self):
+		self.stdscr.addstr(self.line*6+5, self.col*14+6, ' ')
+		self.stdscr.addstr(self.line*6+2, self.col*14+12, '  ') 
 		for l in self.linked_to:
 			if (l.line == self.line + 1) and (l.col == self.col):
 				self.stdscr.addstr(self.line*6+5, self.col*14+6, '│')
-			else:
-				self.stdscr.addstr(self.line*6+5, self.col*14+6, ' ')
 			if (l.line == self.line) and (l.col == self.col + 1):
 				self.stdscr.addstr(self.line*6+2, self.col*14+12, '──') 
-			else:
-				self.stdscr.addstr(self.line*6+2, self.col*14+12, '  ') 
 
 	def print_content_3(self):
 		if self.chain.length() > 0:
 			for i in range(1, 4): 
-				if self.chain.length() > i:
-					self.stdscr.addstr(self.line*6+i, self.col*14+1, '          ', curses.color_pair(self.chain.blocks[-i].value))
+				if self.chain.length() + 1 > i:
+					color = self.chain.blocks[-i].value
+					if i == 2:
+						self.stdscr.addstr(self.line*6+2, self.col*14+1, '   %03d    ' % self.chain.length(), curses.color_pair(color))
+					else:
+						self.stdscr.addstr(self.line*6+i, self.col*14+1, '          ', curses.color_pair(color))
 
 	def print_content(self):
 		self.print_content_3()
 
 	def copy_from_neighbour(self, neighbour): 
+		self.new_chain = []
 		for block in neighbour.chain.blocks[self.new_chain.length():]:
 			self.new_chain.blocks.append(block.copy())
 
@@ -92,7 +99,8 @@ class Computer:
 		self.stdscr.addstr(self.line*6+1+i, self.col*14+1, s)
 
 	def get_content_from_neighours(self):
-		self.new_chain = self.chain.copy()
+		if self.new_chain == None:
+			self.new_chain = self.chain.copy()
 		i = 0
 		best = None
 		best_length = self.new_chain.length()
@@ -101,21 +109,34 @@ class Computer:
 			if comp.chain.length() > best_length:
 				best = comp
 				best_length = comp.chain.length()
-			i = i + 1
-
+			i = i + 1 
 		if best != None:
 			self.copy_from_neighbour(best)
+			return True
+		return False
 
 	def time_shift(self):
 		self.chain = self.new_chain
+		self.new_chaine = None
 
 class Computers:
-	def __init__(self, stdscr):
-		self.cols = 12
-		self.lines = 8 
+	def __init__(self, stdscr, colors, cols = None, lines = None):
+		self.cols = None
+		self.lines = None
+		if (cols == None)	or (lines == None):
+			term_cols, term_lines = shutil.get_terminal_size(fallback=(80,24))
+			if (cols == None):
+				self.cols = term_cols // 14
+			if (lines == None):
+				self.lines = term_lines // 6
+
+		if self.cols == None:
+			self.cols = cols
+		if self.lines == None:
+			self.lines = lines
 		self.count = self.cols * self.lines
 		self.list = []
-		self.colors = [4, 5, 6, 7, 8, 9, 10]
+		self.colors = colors
 		self.idx_col = 0
 		random.shuffle(self.colors)
 		for i in range(0, self.lines):
@@ -135,22 +156,25 @@ class Computers:
 			self.list[i].print_content()
 
 	def propagate_content(self):
-		for comp in self.list:
-			comp.get_content_from_neighours()
-
-	def time_shift(self): 
+		updated = True
+		while updated:
+			updated = False
+			for comp in self.list:
+				if comp.get_content_from_neighours():
+					updated = True
 		for comp in self.list:
 			comp.time_shift()
 
 	def add_random(self):
-		random.choice(self.list).chain.add(self.colors[self.idx_col])
+		comp = random.choice(self.list)
+		comp.chain.add(self.colors[self.idx_col])
 		self.idx_col = (self.idx_col + 1) % len(self.colors)
 
 	def max_length(self):
 		return max([comp.chain.length() for comp in self.list])
 
 class Link:
-	def __init__(self, src, dst):
+	def __init__(self, src, dst, enabled = True):
 		self.src = src
 		self.dst = dst
 		self.enabled = True
@@ -158,14 +182,17 @@ class Link:
 class Links:
 	def __init__(self, computers):
 		self.links = []
-		for i in range(0, computers.lines):	
-			for j in range(0, computers.cols):	
-				comp = computers.list[i * computers.cols + j]
-				if j < computers.cols - 1:
-					comp_to_the_right = computers.list[i * computers.cols + j + 1]
+		self.computers = computers
+
+	def link_all(self):
+		for i in range(0, self.computers.lines):	
+			for j in range(0, self.computers.cols):	
+				comp = self.computers.list[i * self.computers.cols + j]
+				if j < self.computers.cols - 1:
+					comp_to_the_right = self.computers.list[i * self.computers.cols + j + 1]
 					self.links.append(Link(comp, comp_to_the_right))
-				if i < computers.lines - 1:
-					comp_underneath = computers.list[(i + 1) * computers.cols + j] 
+				if i < self.computers.lines - 1:
+					comp_underneath = self.computers.list[(i + 1) * self.computers.cols + j] 
 					self.links.append(Link(comp, comp_underneath))
 
 	def switch_some(self, count = 40):
@@ -174,13 +201,17 @@ class Links:
 			link.enabled = not link.enabled
 			link.src.draw_links()
 			
-	def disable_some(self, count = 40):
+	def disable_some(self, count = None, ratio = None):
+		if count == None:
+			if ratio == None:
+				ratio = 0.5
+			count = int(len(self.links) * ratio)
 		for i in range(0, count):
 			link = random.choice(self.links)
 			link.enabled = False
 
-	def apply(self, computers):
-		for comp in computers.list:
+	def apply(self):
+		for comp in self.computers.list:
 			comp.linked_to = []
 		for link in self.links:
 			if link.enabled:
