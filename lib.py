@@ -14,6 +14,7 @@ class Block:
 	def copy(self):
 		b = Block()
 		b.value = self.value
+		b.color = self.color
 		b.block_number = self.block_number
 		return b
 
@@ -21,10 +22,11 @@ class Chain:
 	def __init__(self):
 		self.blocks = []
 
-	def add(self, color):
+	def add(self, value, color):
 		#self.blocks = self.blocks[-4:]
 		block = Block()
-		block.value = color
+		block.value = value
+		block.color = color
 		block.block_number = len(self.blocks)
 		self.blocks.append(block) 
 
@@ -65,14 +67,21 @@ class Computer:
 				self.stdscr.addstr(self.line*6+2, self.col*14+12, '──') 
 
 	def print_content_3(self):
-		if self.chain.length() > 0:
-			for i in range(1, 4): 
-				if self.chain.length() + 1 > i:
-					color = self.chain.blocks[-i].value
-					if i == 2:
-						self.stdscr.addstr(self.line*6+2, self.col*14+1, '   %03d    ' % self.chain.length(), curses.color_pair(color))
-					else:
-						self.stdscr.addstr(self.line*6+i, self.col*14+1, '          ', curses.color_pair(color))
+		if self.chain.length() == 0:
+			return 
+		color = self.chain.blocks[-1].color
+		self.stdscr.addstr(self.line*6+1, self.col*14+1, '   %03d    ' % self.chain.length(), curses.color_pair(color))
+		if self.chain.length() == 1:
+			return
+		color = self.chain.blocks[-2].color
+
+		self.stdscr.addstr(self.line*6+2, self.col*14+1, '          ', curses.color_pair(color))
+		if self.chain.length() == 2:
+			return 
+		color = self.chain.blocks[-3].color
+		s = ''.join([b.value for b in self.chain.blocks[-10:]])
+		s = s.ljust(10, ' ')
+		self.stdscr.addstr(self.line*6+3, self.col*14+1, s, curses.color_pair(color))
 
 	def print_content(self):
 		self.print_content_3()
@@ -90,10 +99,11 @@ class Computer:
 
 	def copy_from_neighbour(self, neighbour):
 		self.new_chain = neighbour.chain.copy()
-		a = sum([block.value for block in self.chain.blocks])
-		b = sum([block.value for block in self.new_chain.blocks[0:self.chain.length()]])
-		if a != b:
-			self.wrong = self.wrong + 1
+		# find a new way to find out if it's wrong, but i don't care for now
+		#a = sum([block.value for block in self.chain.blocks])
+		#b = sum([block.value for block in self.new_chain.blocks[0:self.chain.length()]])
+		#if a != b:
+		#	self.wrong = self.wrong + 1
 
 	def write_line(self, i, s):
 		self.stdscr.addstr(self.line*6+1+i, self.col*14+1, s)
@@ -120,7 +130,7 @@ class Computer:
 		self.new_chaine = None
 
 class Computers:
-	def __init__(self, stdscr, colors, cols = None, lines = None):
+	def __init__(self, stdscr, colors, values, cols = None, lines = None):
 		self.cols = None
 		self.lines = None
 		if (cols == None)	or (lines == None):
@@ -137,6 +147,7 @@ class Computers:
 		self.count = self.cols * self.lines
 		self.list = []
 		self.colors = colors
+		self.values = values
 		self.idx_col = 0
 		random.shuffle(self.colors)
 		for i in range(0, self.lines):
@@ -167,7 +178,7 @@ class Computers:
 
 	def add_random(self):
 		comp = random.choice(self.list)
-		comp.chain.add(self.colors[self.idx_col])
+		comp.chain.add(self.values[self.idx_col], self.colors[self.idx_col])
 		self.idx_col = (self.idx_col + 1) % len(self.colors)
 
 	def max_length(self):
